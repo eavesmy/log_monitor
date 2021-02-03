@@ -15,17 +15,13 @@ import (
 
 var tasks = sync.Map{}
 
-var scripts_path = ""
+var scripts_path = os.Getenv("MONITOR_SCRIPTS")
 
 func main() {
 
-	if len(os.Args) >= 2 {
-		scripts_path = os.Args[1]
-	}
-
 	lib.LoadScripts(scripts_path)
 
-	cmd := exec.Command("sh", "-c", "tail -f /root/source/server/game-server/logs/*.log")
+	cmd := exec.Command("sh", "-c", "tail -f "+os.Getenv("MONITOR_TARGET"))
 
 	stdout, err := cmd.StdoutPipe()
 
@@ -102,5 +98,4 @@ func notify() {
 
 		lib.LoadScripts(scripts_path)
 	}
-
 }

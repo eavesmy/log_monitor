@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export MONITOR_SCRIPTS=
+export MONITOR_TARGET=
+export MONITOR_HOOK= 

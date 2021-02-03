@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"github.com/robertkrimen/otto"
 	"io/ioutil"
+	"os"
 	"path"
+	"plugin"
 	"strings"
 	"sync"
 )
 
+const (
+	ACTION_ALTER = 1
+)
+
 var Scripts = sync.Map{}
+var Hook plugin.Symbol
 
 type Script struct {
 	Script   *otto.Script
@@ -21,12 +28,47 @@ func (script *Script) Run(line string) {
 
 	script.Vm.Set("line", line)
 	script.Vm.Run(script.Script)
+	v, _ := script.Vm.Get("result")
+
+	r, _ := v.ToString() // 给个 http 钩子?
+
+	go HookFunc(r)
+}
+
+func init() {
+	hookProgPath := os.Getenv("MONITOR_HOOK")
+
+	if hookProgPath == "" {
+		return
+	}
+
+	hook, err := plugin.Open(hookProgPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	f, err := hook.Lookup("Run")
+
+	if err != nil {
+		fmt.Println("Run method required!")
+		return
+	}
+
+	Hook = f
+
+	// 放给一个全局变量
+
+	// hook.Lookup()
+
+	// 加载插件
+	// 判断文件是否存在
+	// 存在则调用
+	// 不存在则略过
+
 }
 
 func LoadScripts(scripts_path string) {
 	// 声明接口，由脚本实现接口
-
-	Scripts = sync.Map{}
 
 	dir, err := ioutil.ReadDir(scripts_path)
 
@@ -43,18 +85,25 @@ func LoadScripts(scripts_path string) {
 			continue
 		}
 
-		vm := otto.New()
-		script, err := vm.Compile(file_path, nil)
+		ins, exists := Scripts.Load(file_path)
 
-		vm.Set("stacks", nil)
-		vm.Run(script) // init vm env
+		if !exists {
+			ins = &Script{}
+			vm := otto.New()
+			ins.(*Script).Vm = vm
+			vm.Set("stacks", nil)
+		}
+
+		script, err := ins.(*Script).Vm.Compile(file_path, nil)
 
 		if err != nil {
 			fmt.Println("laod script failed", scripts_path)
 			continue
 		}
 
-		v, err := vm.Get("keywords")
+		ins.(*Script).Vm.Run(script) // init vm env
+
+		v, err := ins.(*Script).Vm.Get("keywords")
 		if err != nil {
 			fmt.Println("script keywords error", err)
 		}
@@ -63,10 +112,13 @@ func LoadScripts(scripts_path string) {
 			fmt.Println("script keywords undefined", err)
 		}
 
-		Scripts.Store(file.Name(), &Script{
-			Script:   script,
-			Vm:       vm,
-			Keywords: strings.Split(str_v, ","),
-		})
+		ins.(*Script).Keywords = strings.Split(str_v, ",")
+		ins.(*Script).Script = script
+
+		Scripts.Store(file.Name(), ins)
 	}
+}
+
+func HookFunc(result string) {
+	Hook.(func(string))(result)
 }
