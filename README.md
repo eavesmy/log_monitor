@@ -29,6 +29,12 @@ console.log(line);
 var result = "123"; // result 会返回给 hook 进行处理
 ```
 
+### 脚本热更新
+```
+1. 拿到该程序 pid
+2. kill -USR1 [pid]
+```
+
 ## Hook
 在设置过 ```MONITOR_HOOK``` 变量后，每次脚本返回的数据可以通过 hook 进行处理。    
 处理 hook 的程序使用 golang plugin。
